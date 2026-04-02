@@ -14,9 +14,9 @@ class Etablissement extends Model
     use SoftDeletes, LogsActivity;
 
     protected $fillable = [
-        'drena_id', 'iepp_id', 'code', 'nom', 'type', 'statut_juridique',
-        'localite', 'adresse', 'telephone', 'email', 'latitude', 'longitude',
-        'effectif_eleves', 'effectif_enseignants', 'actif',
+        'drena_id', 'iepp_id', 'code', 'nom', 'type', 'ordre_enseignement',
+        'statut_juridique', 'localite', 'adresse', 'telephone', 'email',
+        'latitude', 'longitude', 'effectif_eleves', 'effectif_enseignants', 'actif',
     ];
 
     protected $casts = ['actif' => 'boolean'];
@@ -48,6 +48,23 @@ class Etablissement extends Model
 
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->logOnly(['nom', 'actif', 'iepp_id'])->logOnlyDirty();
+        return LogOptions::defaults()->logOnly(['nom', 'actif', 'iepp_id', 'ordre_enseignement'])->logOnlyDirty();
+    }
+
+    public function estPrimaire(): bool
+    {
+        return $this->ordre_enseignement === 'primaire';
+    }
+
+    public function estSecondaire(): bool
+    {
+        return $this->ordre_enseignement === 'secondaire';
+    }
+
+    public function getCircuitValidationAttribute(): string
+    {
+        return $this->estPrimaire()
+            ? 'Chef → Inspecteur → DRENA'
+            : 'Chef → DRENA';
     }
 }

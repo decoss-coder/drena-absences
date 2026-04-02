@@ -163,8 +163,8 @@ class AbsenceController extends Controller
                 }
             }
 
-            // Soumettre l'absence (déclenche le workflow)
-            $absence->update(['statut' => 'en_validation_n1']);
+            // Soumettre l'absence (détermine le circuit primaire/secondaire)
+            $absence->soumettre();
 
             // Notifier le chef d'établissement
             $chefEtab = User::role('chef_etablissement')
@@ -213,26 +213,37 @@ class AbsenceController extends Controller
 
         $user = Auth::user();
 
-        // Vérifier que l'utilisateur peut valider
-        $canValidate = match($absence->statut) {
-            'en_validation_n1' => $user->hasRole('chef_etablissement') && $user->etablissement_id === $absence->etablissement_id,
-            'en_validation_n2' => $user->hasRole('inspecteur') && $user->iepp_id === $absence->iepp_id,
-            'en_validation_n3' => $user->hasRole('admin_drena') && $user->drena_id === $absence->drena_id,
-            default => false,
-        };
-
-        if (!$canValidate) {
+        // Vérifier que l'utilisateur peut valider (tient compte du circuit)
+        if (!$absence->peutEtreValideePar($user)) {
             abort(403, 'Vous n\'êtes pas autorisé à valider cette absence.');
         }
 
         $validation = $absence->valider($user, $request->decision, $request->commentaire);
 
-        // Notifications
+        // Notifications selon le nouveau statut
         $absence->refresh();
-        if ($absence->statut === 'approuvee') {
+
+        if ($absence->statut === Absence::STATUT_APPROUVEE) {
+            // Fin du circuit → notifier l'agent
             $absence->user->notify(new AbsenceValidee($absence));
-        } elseif ($absence->statut === 'refusee') {
+        } elseif ($absence->statut === Absence::STATUT_REFUSEE) {
             $absence->user->notify(new AbsenceRefusee($absence));
+        } elseif ($absence->statut === Absence::STATUT_EN_VALIDATION_INSPECTEUR) {
+            // Primaire : escalade vers l'inspecteur
+            $inspecteur = User::role('inspecteur')
+                ->where('iepp_id', $absence->iepp_id)
+                ->first();
+            if ($inspecteur) {
+                $inspecteur->notify(new AbsenceSoumise($absence));
+            }
+        } elseif ($absence->statut === Absence::STATUT_EN_VALIDATION_DRENA) {
+            // Escalade vers la DRENA (primaire après inspecteur, ou secondaire après chef)
+            $adminDrena = User::role('admin_drena')
+                ->where('drena_id', $absence->drena_id)
+                ->first();
+            if ($adminDrena) {
+                $adminDrena->notify(new AbsenceSoumise($absence));
+            }
         }
 
         $message = match($request->decision) {

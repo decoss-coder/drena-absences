@@ -1,28 +1,12 @@
 @extends('layouts.app')
 @section('title', 'Gestion des DRENA')
 @section('page-title', 'Gestion des DRENA')
-@section('page-subtitle', 'Administration nationale — MENA')
+@section('page-subtitle', 'Administration des Directions Régionales')
 @section('content')
-<div class="flex justify-between mb-6">
-    <p class="text-sm text-gray-500">{{ $drenas->total() }} DRENA enregistrées</p>
-    <a href="{{ route('admin.drenas.create') }}" class="btn btn-primary text-sm">Créer une DRENA</a>
-</div>
-<div class="table-container"><table><thead><tr><th>Code</th><th>Nom</th><th>Région</th><th>IEPP</th><th>Établ.</th><th>Agents</th><th>Statut</th><th>Actions</th></tr></thead><tbody>
-@foreach($drenas as $d)
-<tr>
-    <td class="font-mono text-xs">{{ $d->code }}</td>
-    <td class="font-medium">{{ $d->nom }}</td>
-    <td>{{ $d->region }}</td>
-    <td>{{ $d->iepps_count }}</td>
-    <td>{{ $d->etablissements_count }}</td>
-    <td>{{ $d->users_count }}</td>
-    <td><span class="badge {{ $d->actif ? 'badge-green' : 'badge-gray' }}">{{ $d->actif ? 'Active' : 'Inactive' }}</span></td>
-    <td class="space-x-2">
-        <a href="{{ route('admin.drenas.edit', $d) }}" class="text-sm text-blue-600 hover:underline">Modifier</a>
-        <a href="{{ route('admin.drenas.create-admin', $d) }}" class="text-sm text-emerald-600 hover:underline">+ Admin</a>
-    </td>
-</tr>
-@endforeach
+<div class="flex items-center justify-between mb-6"><p class="text-sm text-gray-400">{{ $drenas->count() }} DRENA</p><a href="{{ route('admin.drenas.create') }}" class="btn-primary">Ajouter</a></div>
+<div class="table-container"><table class="table-elegant"><thead><tr><th>Code</th><th>Nom</th><th>Région</th><th>Agents</th><th>Établ.</th><th>Statut</th><th></th></tr></thead><tbody>
+@forelse($drenas as $d)
+<tr><td class="font-mono text-xs text-gray-400">{{ $d->code }}</td><td class="font-medium text-gray-800">{{ $d->nom }}</td><td>{{ $d->region }}</td><td>{{ $d->users_count ?? 0 }}</td><td>{{ $d->etablissements_count ?? 0 }}</td><td><span class="badge {{ $d->actif?'badge-green':'badge-gray' }}">{{ $d->actif?'Active':'Inactive' }}</span></td><td class="flex gap-2"><a href="{{ route('admin.drenas.edit',$d) }}" class="text-sm text-violet-600 font-medium">Modifier</a><a href="{{ route('admin.drenas.create-admin',$d) }}" class="text-sm text-emerald-600 font-medium">Admin</a></td></tr>
+@empty<tr><td colspan="7" class="text-center text-gray-400 py-8">Aucune DRENA</td></tr>@endforelse
 </tbody></table></div>
-<div class="mt-6">{{ $drenas->links() }}</div>
 @endsection

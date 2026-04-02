@@ -1,23 +1,10 @@
 @extends('layouts.app')
 @section('title', 'Années scolaires')
-@section('page-title', 'Configuration — Années scolaires')
+@section('page-title', 'Années scolaires')
 @section('content')
-<div class="table-container">
-    <table>
-        <thead><tr><th>Libellé</th><th>Début</th><th>Fin</th><th>T1</th><th>T2</th><th>T3</th><th>En cours</th></tr></thead>
-        <tbody>
-            @foreach($annees as $a)
-            <tr>
-                <td class="font-medium">{{ $a->libelle }}</td>
-                <td class="text-sm">{{ $a->date_debut->format('d/m/Y') }}</td>
-                <td class="text-sm">{{ $a->date_fin->format('d/m/Y') }}</td>
-                <td class="text-xs text-gray-500">{{ $a->trimestre1_debut?->format('d/m') }} — {{ $a->trimestre1_fin?->format('d/m') }}</td>
-                <td class="text-xs text-gray-500">{{ $a->trimestre2_debut?->format('d/m') }} — {{ $a->trimestre2_fin?->format('d/m') }}</td>
-                <td class="text-xs text-gray-500">{{ $a->trimestre3_debut?->format('d/m') }} — {{ $a->trimestre3_fin?->format('d/m') }}</td>
-                <td>{!! $a->en_cours ? '<span class="badge badge-green">En cours</span>' : '<span class="badge badge-gray">Terminée</span>' !!}</td>
-            </tr>
-            @endforeach
-        </tbody>
-    </table>
-</div>
+<div class="table-container"><table class="table-elegant"><thead><tr><th>Libellé</th><th>Début</th><th>Fin</th><th>Statut</th></tr></thead><tbody>
+@forelse($annees as $a)
+<tr><td class="font-medium text-gray-800">{{ $a->libelle }}</td><td>{{ $a->date_debut->format('d/m/Y') }}</td><td>{{ $a->date_fin->format('d/m/Y') }}</td><td><span class="badge {{ $a->en_cours?'badge-green':'badge-gray' }}">{{ $a->en_cours?'En cours':'Terminée' }}</span></td></tr>
+@empty<tr><td colspan="4" class="text-center text-gray-400 py-8">Aucune année</td></tr>@endforelse
+</tbody></table></div>
 @endsection

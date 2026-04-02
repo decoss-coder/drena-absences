@@ -17,52 +17,57 @@ class EscaladeAbsences extends Command
     {
         $heuresMax = config('drena.escalation_hours', 48);
         $dateLimite = now()->subHours($heuresMax);
+        $total = 0;
 
-        $absencesN1 = Absence::where('statut', 'en_validation_n1')
+        // Chef → Inspecteur (primaire uniquement) ou Chef → DRENA (secondaire)
+        $absencesChef = Absence::where('statut', Absence::STATUT_EN_VALIDATION_CHEF)
             ->where('updated_at', '<=', $dateLimite)
             ->get();
 
-        foreach ($absencesN1 as $absence) {
-            $absence->update([
-                'statut' => 'en_validation_n2',
-                'niveau_validation_actuel' => 2,
-            ]);
-
-            $inspecteur = User::role('inspecteur')
-                ->where('iepp_id', $absence->iepp_id)
-                ->first();
-
-            if ($inspecteur) {
-                $inspecteur->notify(new AbsenceSoumise($absence));
+        foreach ($absencesChef as $absence) {
+            if ($absence->circuit_validation === Absence::CIRCUIT_SECONDAIRE) {
+                // Secondaire : escalade directe vers DRENA
+                $absence->update([
+                    'statut' => Absence::STATUT_EN_VALIDATION_DRENA,
+                    'niveau_validation_actuel' => 2,
+                ]);
+                $admin = User::role('admin_drena')->where('drena_id', $absence->drena_id)->first();
+                if ($admin) $admin->notify(new AbsenceSoumise($absence));
+            } else {
+                // Primaire : escalade vers inspecteur
+                $absence->update([
+                    'statut' => Absence::STATUT_EN_VALIDATION_INSPECTEUR,
+                    'niveau_validation_actuel' => 2,
+                ]);
+                $inspecteur = User::role('inspecteur')->where('iepp_id', $absence->iepp_id)->first();
+                if ($inspecteur) $inspecteur->notify(new AbsenceSoumise($absence));
             }
 
-            Log::info("Absence {$absence->reference} escaladée N1 → N2 (48h sans réponse)");
+            Log::info("Absence {$absence->reference} escaladée Chef → " .
+                ($absence->circuit_validation === 'secondaire' ? 'DRENA' : 'Inspecteur') .
+                " (48h sans réponse)");
+            $total++;
         }
 
-        $absencesN2 = Absence::where('statut', 'en_validation_n2')
+        // Inspecteur → DRENA (primaire uniquement)
+        $absencesInspecteur = Absence::where('statut', Absence::STATUT_EN_VALIDATION_INSPECTEUR)
             ->where('updated_at', '<=', $dateLimite)
             ->get();
 
-        foreach ($absencesN2 as $absence) {
+        foreach ($absencesInspecteur as $absence) {
             $absence->update([
-                'statut' => 'en_validation_n3',
+                'statut' => Absence::STATUT_EN_VALIDATION_DRENA,
                 'niveau_validation_actuel' => 3,
             ]);
 
-            $adminDrena = User::role('admin_drena')
-                ->where('drena_id', $absence->drena_id)
-                ->first();
+            $admin = User::role('admin_drena')->where('drena_id', $absence->drena_id)->first();
+            if ($admin) $admin->notify(new AbsenceSoumise($absence));
 
-            if ($adminDrena) {
-                $adminDrena->notify(new AbsenceSoumise($absence));
-            }
-
-            Log::info("Absence {$absence->reference} escaladée N2 → N3 (48h sans réponse)");
+            Log::info("Absence {$absence->reference} escaladée Inspecteur → DRENA (48h sans réponse)");
+            $total++;
         }
 
-        $total = $absencesN1->count() + $absencesN2->count();
         $this->info("{$total} absence(s) escaladée(s).");
-
         return self::SUCCESS;
     }
 }
